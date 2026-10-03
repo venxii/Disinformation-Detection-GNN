@@ -51,14 +51,27 @@ def _text(text: str) -> str:
     return normalise_text(re.sub(r"https?://\S+", " url ", text))
 
 
+# Candidate configurations: exactly the ones compared during development. Under the clean
+# protocol one is chosen per LOEO fold on the *validation* event's annotations only.
+FEATURE_GRID = ([{"features": "embedding", "C": C} for C in (0.005, 0.02, 0.1)]
+                + [{"features": "tfidf", "C": C} for C in (1.0, 3.0)]
+                + [{"features": "hybrid", "C": C} for C in (1.0, 3.0)])
+
+
 class StanceModel:
-    def __init__(self, C: float = 1.0, embedding_weight: float = 0.05, seed: int = 7):
-        self.C, self.embedding_weight, self.seed = C, embedding_weight, seed
+    """features: "hybrid" (TF-IDF + 0.05 x BERTweet pair vectors), "tfidf", or "embedding" (BERTweet pair vectors only)."""
+
+    def __init__(self, C: float = 1.0, embedding_weight: float = 0.05, seed: int = 7, features: str = "hybrid"):
+        self.C, self.embedding_weight, self.seed, self.features = C, embedding_weight, seed, features
 
     def _features(self, texts, pair_vecs):
+        if self.features == "embedding":
+            return self.scaler.transform(pair_vecs)
         texts = [_text(t) for t in texts]
-        dense = sparse.csr_matrix(self.scaler.transform(pair_vecs) * self.embedding_weight)
-        return sparse.hstack([self.words.transform(texts), self.chars.transform(texts), dense]).tocsr()
+        parts = [self.words.transform(texts), self.chars.transform(texts)]
+        if self.features == "hybrid":
+            parts.append(sparse.csr_matrix(self.scaler.transform(pair_vecs) * self.embedding_weight))
+        return sparse.hstack(parts).tocsr()
 
     def fit(self, threads, embeddings, stance_labels, exclude_events=()):
         texts, X, y = [], [], []
@@ -104,3 +117,13 @@ class StanceModel:
         report = classification_report(y, p, labels=range(len(STANCES)), target_names=STANCES, output_dict=True, zero_division=0)
         return {"n": len(y), "macro_f1": f1_score(y, p, labels=range(len(STANCES)), average="macro", zero_division=0),
                 "per_class_f1": {s: report[s]["f1-score"] for s in STANCES}}
+
+
+def select_stance_config(threads, embeddings, stance_labels, test_event, validation_event, seed=7):
+    """Pick a FEATURE_GRID entry by macro-F1 on the validation event, training on events other than test and validation."""
+    table = []
+    for cfg in FEATURE_GRID:
+        model = StanceModel(seed=seed, **cfg).fit(threads, embeddings, stance_labels, exclude_events=[test_event, validation_event])
+        table.append({**cfg, "val_macro_f1": model.evaluate(threads, embeddings, stance_labels, [validation_event]).get("macro_f1")})
+    best = max(table, key=lambda r: -1 if r["val_macro_f1"] is None else r["val_macro_f1"])
+    return {k: best[k] for k in ("features", "C")}, table

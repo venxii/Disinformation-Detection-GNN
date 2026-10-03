@@ -103,8 +103,12 @@ def main():
     parser.add_argument("--task", choices=sorted(TASKS), default="4class")
     parser.add_argument("--root", default="artifacts/lifecycle")
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--legacy-gate", action="store_true", help="read/write the variants/legacy_gate outputs")
+    parser.add_argument("--clean", action="store_true", help="read/write the variants/clean outputs (validation-selected stance model and gate)")
     args = parser.parse_args()
     out = Path(args.root) / args.task
+    dest = out / "variants" / ("clean" if args.clean else "legacy_gate") if (args.clean or args.legacy_gate) else out
+    stance_dir = Path(args.root) / ("stance_clean" if args.clean else "stance")
     all_threads, embeddings = load_threads()
     embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
     emb_t = torch.from_numpy(embeddings)
@@ -116,10 +120,11 @@ def main():
     K = len(CHECKPOINTS)
     records = []
     for held_out, validation, train_events in loeo_folds(threads):
-        report = json.loads((out / "folds" / f"{held_out}.json").read_text())
+        report = json.loads((dest / "folds" / f"{held_out}.json").read_text())
         meta = json.loads((out / "verifiers" / f"{held_out}.json").read_text())
-        stance_cache = pickle.loads((Path(args.root) / "stance" / f"{held_out}.pkl").read_bytes())["by_root"]
-        stance_model = StanceModel().fit(all_threads, embeddings, gold_stance, exclude_events=[held_out])
+        stance_info = pickle.loads((stance_dir / f"{held_out}.pkl").read_bytes())
+        stance_cache = stance_info["by_root"]
+        stance_model = StanceModel(**stance_info.get("config", {})).fit(all_threads, embeddings, gold_stance, exclude_events=[held_out])
         train_idx = [i for i, t in enumerate(threads) if t.event in train_events]
         evidence_model = EvidenceModel.fit([stance_cache[threads[i].root_id][~threads[i].is_source] for i in train_idx], labels[train_idx], C)
         verifier = TemporalVerifier(VerifierConfig(**meta["dgtr_config"]))
@@ -134,7 +139,7 @@ def main():
         # 1. eligibility per system from its own natural trajectory
         jobs = {}
         for name in TESTED:
-            with gzip.open(out / "trajectories" / f"{held_out}_{name}.jsonl.gz", "rt") as f:
+            with gzip.open(dest / "trajectories" / f"{held_out}_{name}.jsonl.gz", "rt") as f:
                 for line in f:
                     r = json.loads(line)
                     row = r["log"][K - 2]
@@ -177,7 +182,7 @@ def main():
                                 "final_label": last["label"], "final_state": last["state"],
                                 "verifier_flipped": int(np.argmax(p_last)) != label, "conflict": last["conflict"]})
         print(f"[{args.task}] {held_out}: {len(keys)} injected variants", flush=True)
-    with gzip.open(out / "injection_records.jsonl.gz", "wt") as f:
+    with gzip.open(dest / "injection_records.jsonl.gz", "wt") as f:
         for r in records:
             f.write(json.dumps(r, default=float) + "\n")
     summary = {}
@@ -193,7 +198,7 @@ def main():
                          "verifier_flip_rate": {s: float(np.mean([r["verifier_flipped"] for r in v])) if v else None for s, v in by_s.items()},
                          "precision": tp / (tp + fp) if tp + fp else None, "recall": tp / (tp + fn) if tp + fn else None,
                          "f1": 2 * tp / (2 * tp + fp + fn) if tp else 0.0}
-    (out / "injection_summary.json").write_text(json.dumps(summary, indent=2))
+    (dest / "injection_summary.json").write_text(json.dumps(summary, indent=2))
     for name, s in summary.items():
         print(name, json.dumps(s["reopen_rate"]), "P/R/F1", s["precision"], s["recall"], round(s["f1"], 3))
 

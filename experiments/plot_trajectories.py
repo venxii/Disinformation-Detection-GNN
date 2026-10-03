@@ -27,7 +27,7 @@ SYSTEMS = {"b_early_no_revision": "(b) early, no revision", "c_revision_no_confl
 
 def load(out, name):
     rows = {}
-    for path in sorted((out / "trajectories").glob(f"*_{name}.jsonl.gz")):
+    for path in sorted((out / "trajectories").glob(f"*-threads_{name}.jsonl.gz")):
         with gzip.open(path, "rt") as f:
             for line in f:
                 r = json.loads(line)

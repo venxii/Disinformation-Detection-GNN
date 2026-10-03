@@ -18,31 +18,29 @@ We evaluate the whole decision trajectory, not just final accuracy. Our question
 - revising whenever the classifier's prediction changes;
 - deciding only at the end.
 
-## 2. Contribution bullets (only what the results support)
+## 2. Contribution (clean protocol; decision timing first, revision as a safety layer)
 
-1. **An evaluation protocol and open implementation of the rumour-decision lifecycle on PHEME.**
-   - Causal snapshots at 10/20/30/50/75/100% of each thread.
-   - Event-held-out evaluation.
-   - Trajectory metrics: earliness, coverage and accuracy per checkpoint, reopen precision/recall, false-reopen rate, time-to-correct, flips, and chance-corrected utility.
-   - A controlled late-evidence injection test, which supplies the "a reopen should happen here" ground truth that PHEME lacks.
-2. **An evidence store and conflict detector.**
-   - It separates *semantic strength* (one confident contradicting reply) from *volume* (many distinct weaker replies).
-   - Near-duplicate replies collapse into one cluster.
-   - Unit tests cover every required edge case (40 tests, all passing).
-3. **Mechanism result (injection test, 4-class).** Conflict-gated reopening targets the right scenarios far better than revision on prediction change:
-   - reopen precision 0.60 vs 0.36;
-   - F1 0.31 vs 0.11.
-   - Deduplication cuts reopens caused by duplicated weak contradictions from 13% to 9%.
-   - The strength path does almost all of the work; the volume path is nearly inactive at the tuned thresholds.
-4. **Negative empirical findings** that are themselves informative:
-   - **Revision does not improve outcomes on natural trajectories.** On natural PHEME trajectories, conflict-gated revision does **not** improve utility or final accuracy over no revision (Δ utility −0.0009, 95% CI [−0.0028, +0.0010]).
-   - **The cause is the data, not only the stance model.** Even *human* stance labels move veracity odds by at most ≈1.7× per reply (log-likelihood ratio ≤ 0.55 nats).
-   - **Extra posts barely help any verifier.** Verifier accuracy is essentially flat from 10% to 100% of a thread.
+> All headline numbers come from the clean protocol in `docs/rq_results.md`, which supersedes §4 below wherever they differ. Under the clean protocol, the stance features and the reopen-gate design are selected on validation events only.
 
-What **not** to claim:
-- that the full system beats the baselines on natural data;
-- that the temporal verifier beats the existing GAT (it is a statistical tie on 4-class and worse on veracity);
-- that this is a fact-checking system.
+**What we study.** When an early rumour-verification system should stop waiting and commit, and whether a revision layer can safely withdraw commitments when contradicting evidence arrives late. The setting is PHEME, with leave-one-event-out evaluation and causal, leakage-tested snapshots.
+
+**Main finding: later propagation adds little on PHEME.** Committing every 4-class decision at 10% of the thread costs only 0.67 pp accuracy [0.14, 1.17] relative to waiting for the full thread. An untuned "always commit at 10%" policy ties four tuned commit policies on earliness-weighted utilities. A calibration-aware threshold commits on 88% of threads within the first fifth of the conversation, with no detectable loss relative to waiting (−0.03 pp [−0.42, +0.34]).
+
+**These are relative claims.** The verifier is below majority-class accuracy in 6 of 9 held-out events and beats the majority baseline only on macro-F1 (0.358 vs 0.193).
+
+**Revision as a safety layer.** A conflict-gated revision layer (semantic strength vs volume, with near-duplicate collapsing):
+- does not change final accuracy (−0.12 pp [−0.47, +0.20]);
+- costs a little timing utility;
+- detects injected late contradictions better than revising on prediction changes (reopen F1 0.24 vs 0.11; paired Δ +0.14 [+0.10, +0.17]).
+
+**Caveats on the safety layer.** Recall is low (0.15). On 4-class the advantage comes from the 2 of 9 folds where validation selected the less conservative gate; in the other 7 the selected gate is almost inert.
+
+**Not claimed:**
+- absolute accuracy gains;
+- that revision improves natural-thread accuracy;
+- that the temporal verifier beats the existing GAT;
+- that revised labels are correct;
+- any veracity-only result (below majority-class accuracy; moved to limitations).
 
 ## 3. Method
 
@@ -241,11 +239,19 @@ Veracity, (d) vs (c): precision 0.73 vs 0.39, F1 0.24 vs 0.12. Dedup: 3.8% vs 10
 
 ## 6. Deviations from the plan, recorded
 
+**Clean protocol (current).** Both selection leaks listed below are fixed by `--clean` in `experiments/run_lifecycle.py` and `experiments/run_injection.py`:
+- **Stance features** are chosen per fold on the validation event (`lifecycle.stance.select_stance_config`).
+- **The gate design** is a validation-selected hyperparameter (`STAGE_B_GRID_CLEAN`).
+
+Outputs are under `artifacts/lifecycle/<task>/variants/clean/` and `artifacts/lifecycle/stance_clean/`. The items below describe the earlier, leaky protocol.
+
+
 - **TRIDENT removed entirely** (no verifiable source). DGTR-style is the only temporal model.
 - **Inner validation rule changed** to the next *rich* event (see §4).
 - **Gate semantics changed after one smoke-test fold** on veracity/germanwings, before the full runs. The semantic path no longer requires net ≥ θ_net, because at PHEME's LLR scale a single post could never trigger it, which contradicted edge case 4.
 - **Weak-evidence floor added.** Only stance-bearing clusters enter the net sums; neutral comments were masking strong denials. This was found by a unit test.
-- **Stance features switched** from embeddings-only to the TF-IDF+embedding hybrid after comparing held-out macro-F1 on 4 events (0.37–0.40 → 0.37–0.45).
+- **Stance features switched** from embeddings-only to the TF-IDF+embedding hybrid after comparing held-out macro-F1 on 4 events (0.37–0.40 → 0.37–0.45). That comparison used *test-event* stance annotations: it is selection on held-out labels, affecting the stance model only.
+- **Gate-change sensitivity check** (`experiments/gate_check.py`, `artifacts/lifecycle/gate_check.md`; the legacy gate is rerun via `--legacy-gate`). RQ2 conclusions hold under both gates and without the inspected fold. The 4-class injection advantage exists only under the current gate (legacy F1 0.01 vs (c) 0.11).
 
 ## 7. Reproduce
 
@@ -263,3 +269,17 @@ Veracity, (d) vs (c): precision 0.73 vs 0.39, F1 0.24 vs 0.12. Dedup: 3.8% vs 10
 ```
 
 All runs use seed 7. Tuned thresholds per fold are in `artifacts/lifecycle/<task>/folds/<event>.json`.
+
+### Reframed analysis (RQ1–RQ3)
+```bash
+.venv/bin/python -m experiments.run_lifecycle --task 4class --legacy-gate [--only-event E]   # gate-change check
+.venv/bin/python -m experiments.run_lifecycle --task 4class --legacy-gate --summarize
+.venv/bin/python -m experiments.run_injection --task 4class --legacy-gate
+.venv/bin/python -m experiments.gate_check > artifacts/lifecycle/gate_check.md
+.venv/bin/python -m experiments.run_commit_policies --task 4class                       # RQ1, validation cross-fit
+.venv/bin/python -m experiments.run_lifecycle --task 4class --clean [--only-event E]        # clean protocol
+.venv/bin/python -m experiments.run_lifecycle --task 4class --clean --summarize
+.venv/bin/python -m experiments.run_injection --task 4class --clean
+.venv/bin/python -m experiments.majority_baseline > artifacts/lifecycle/majority_baseline.md
+.venv/bin/python -m experiments.rq_analysis                                              # CIs + RQ1 figures (incl. clean)
+```

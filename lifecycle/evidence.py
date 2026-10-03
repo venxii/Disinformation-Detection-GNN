@@ -164,6 +164,7 @@ class ConflictConfig:
     kappa_confirmed: float = 1.5
     use_strength: bool = True
     use_volume: bool = True
+    semantic_requires_net: bool = False  # True = pre-change (legacy) gate, kept for the sensitivity check
 
 
 @dataclass
@@ -200,7 +201,7 @@ class ConflictDetector:
         volume = int(conflict_on.sum())
         net = float(conflict[conflict_on].sum() - c.beta_support * support[support_on].sum())
         scale = c.kappa_confirmed if confirmed else 1.0
-        semantic = c.use_strength and strength >= c.theta_strong and net >= 0.0
+        semantic = c.use_strength and strength >= c.theta_strong and net >= (c.theta_net * scale if c.semantic_requires_net else 0.0)
         by_volume = c.use_volume and volume >= c.v_min and net >= c.theta_net * scale
         triggered = bool(semantic or by_volume)
         return ConflictAssessment(strength, volume, float(conflict[conflict_on].sum()), float(support[support_on].sum()), net, len(new), triggered)

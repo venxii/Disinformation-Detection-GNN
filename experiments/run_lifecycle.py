@@ -30,8 +30,8 @@ from pathlib import Path
 import numpy as np
 
 from lifecycle.data import CHECKPOINTS, TASKS, load_threads, loeo_folds, task_threads
-from lifecycle.evidence import EvidenceModel
-from lifecycle.stance import StanceModel, load_stance_labels
+from lifecycle.evidence import ConflictConfig, EvidenceModel
+from lifecycle.stance import StanceModel, load_stance_labels, select_stance_config
 from lifecycle.state_machine import LifecycleConfig, run_thread
 from lifecycle.trajectory_metrics import lifecycle_metrics, thread_summary, thread_utility, verifier_metrics
 
@@ -44,14 +44,22 @@ def softmax(z):
     return e / e.sum(-1, keepdims=True)
 
 
-def fold_stance(all_threads, embeddings, held_out, cache_dir: Path):
+def fold_stance(all_threads, embeddings, held_out, cache_dir: Path, validation=None):
+    """Stance predictions for every thread from a model that never saw the held-out event's labels.
+
+    validation=None reproduces the original run (hybrid features, chosen during development).
+    With a validation event, features are selected on that event only (clean protocol)."""
     path = cache_dir / f"{held_out}.pkl"
     if path.exists():
         return pickle.loads(path.read_bytes())
     labels = load_stance_labels()
-    model = StanceModel().fit(all_threads, embeddings, labels, exclude_events=[held_out])
+    config, table = {"features": "hybrid", "C": 1.0}, None
+    if validation is not None:
+        config, table = select_stance_config(all_threads, embeddings, labels, held_out, validation)
+    model = StanceModel(**config).fit(all_threads, embeddings, labels, exclude_events=[held_out])
     result = {"by_root": {t.root_id: model.predict_thread(t, embeddings) for t in all_threads},
-              "heldout_eval": model.evaluate(all_threads, embeddings, labels, [held_out]), "n_train": model.n_train}
+              "heldout_eval": model.evaluate(all_threads, embeddings, labels, [held_out]), "n_train": model.n_train,
+              "config": config, "selection_table": table}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(pickle.dumps(result))
     return result
@@ -105,14 +113,17 @@ def oracle_stance(threads, stance, gold_stance):
     return out
 
 
-def run_fold(args, held_out, validation, train_events, threads, labels, embeddings, all_threads, C, root, out):
+def run_fold(args, held_out, validation, train_events, threads, labels, embeddings, all_threads, C, root, out, dest):
     start = time.time()
     fold = np.load(out / "verifiers" / f"{held_out}.npz")
     meta = json.loads((out / "verifiers" / f"{held_out}.json").read_text())
     assert meta["validation"] == validation
     val_idx, test_idx = fold["val_idx"], fold["test_idx"]
     probs = {m: {s: softmax(fold[f"{m}_{s}"] / meta["temperatures"][m]) for s in ("val", "test")} for m in meta["temperatures"]}
-    stance_info = fold_stance(all_threads, embeddings, held_out, root / "stance")
+    if args.clean:
+        stance_info = fold_stance(all_threads, embeddings, held_out, root / "stance_clean", validation=validation)
+    else:
+        stance_info = fold_stance(all_threads, embeddings, held_out, root / "stance")
     stance = stance_info["by_root"]
     train_idx = [i for i, t in enumerate(threads) if t.event in train_events]
     evidence_model = EvidenceModel.fit([stance[threads[i].root_id][~threads[i].is_source] for i in train_idx], labels[train_idx], C)
@@ -122,14 +133,17 @@ def run_fold(args, held_out, validation, train_events, threads, labels, embeddin
     def evaluate(cfg):
         return lifecycle_metrics(replay(cfg, evidence_model, threads, val_idx, embeddings, stance, p_val, val_gold), C)["utility"]
 
-    commit, u_a, table_a = tune(LifecycleConfig(gate="none"), STAGE_A_GRID, evaluate)
-    full, u_b, table_b = tune(commit.with_(gate="conflict"), STAGE_B_GRID, evaluate)
+    base = LifecycleConfig(gate="none", conflict=ConflictConfig(semantic_requires_net=args.legacy_gate))
+    commit, u_a, table_a = tune(base, STAGE_A_GRID, evaluate)
+    full, u_b, table_b = tune(commit.with_(gate="conflict"), STAGE_B_GRID_CLEAN if args.clean else STAGE_B_GRID, evaluate)
     report = {"held_out": held_out, "validation": validation, "stance_heldout": stance_info["heldout_eval"],
+              "stance_config": stance_info.get("config"), "stance_selection_table": stance_info.get("selection_table"),
+              "gate_design": "legacy" if full.conflict.semantic_requires_net else "current",
               "stance_train_n": stance_info["n_train"], "llr_table": evidence_model.llr.round(3).tolist(),
               "stance_given_label": evidence_model.p.round(4).tolist(),
               "val_utility": {"stage_a": u_a, "stage_b": u_b}, "commit_config": asdict(commit), "full_config": asdict(full),
               "tuning_tables": {"stage_a": table_a, "stage_b": table_b}, "systems": {}}
-    logs_dir = out / "trajectories"
+    logs_dir = dest / "trajectories"
     logs_dir.mkdir(parents=True, exist_ok=True)
     runs = {name: (cfg, evidence_model, stance, test_idx) for name, cfg in systems(commit, full).items()}
     # Oracle-stance condition on test threads with >= 1 human-annotated reply (evidence model refit the same way).
@@ -151,8 +165,8 @@ def run_fold(args, held_out, validation, train_events, threads, labels, embeddin
             for r in results:
                 f.write(json.dumps(r) + "\n")
     np.savez_compressed(out / "verifiers" / f"{held_out}_calibrated_test.npz", gold=test_gold, **{m: probs[m]["test"] for m in probs})
-    (out / "folds").mkdir(exist_ok=True)
-    (out / "folds" / f"{held_out}.json").write_text(json.dumps(report, indent=2, default=float))
+    (dest / "folds").mkdir(parents=True, exist_ok=True)
+    (dest / "folds" / f"{held_out}.json").write_text(json.dumps(report, indent=2, default=float))
     d, b = report["systems"]["d_full"], report["systems"]["b_early_no_revision"]
     print(f"[{args.task}] {held_out}: val U a/b={u_a:.3f}/{u_b:.3f} commit tau={commit.tau_prov}/{commit.tau_conf} units={commit.min_units_prov} "
           f"gate net={full.conflict.theta_net} strong={full.conflict.theta_strong} v={full.conflict.v_min} gamma={full.gamma} | "
@@ -167,12 +181,12 @@ def paired_bootstrap(a, b, reps=2000, seed=7):
     return {"mean": float(diff.mean()), "ci95": [float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))]}
 
 
-def summarize(out: Path, C: int, task: str):
-    reports = {p.stem: json.loads(p.read_text()) for p in sorted((out / "folds").glob("*.json"))}
+def summarize(out: Path, C: int, task: str, dest: Path):
+    reports = {p.stem: json.loads(p.read_text()) for p in sorted((dest / "folds").glob("*.json"))}
     pooled = {}
     for event in reports:
         for name in reports[event]["systems"]:
-            with gzip.open(out / "trajectories" / f"{event}_{name}.jsonl.gz", "rt") as f:
+            with gzip.open(dest / "trajectories" / f"{event}_{name}.jsonl.gz", "rt") as f:
                 pooled.setdefault(name, []).extend(json.loads(line) for line in f)
     calibrated = [np.load(out / "verifiers" / f"{e}_calibrated_test.npz") for e in reports]
     gold = np.concatenate([c["gold"] for c in calibrated])
@@ -195,14 +209,19 @@ def summarize(out: Path, C: int, task: str):
                              "gate": {k: r["full_config"]["conflict"][k] for k in ("theta_net", "theta_strong", "v_min")} | {"gamma": r["full_config"]["gamma"]}}
                          for e, r in reports.items()},
                "stance_heldout_macro_f1": {e: r["stance_heldout"].get("macro_f1") for e, r in reports.items()}}
-    (out / "summary.json").write_text(json.dumps(summary, indent=2, default=float))
-    print(f"saved={out / 'summary.json'}")
+    (dest / "summary.json").write_text(json.dumps(summary, indent=2, default=float))
+    print(f"saved={dest / 'summary.json'}")
 
 
 STAGE_A_GRID = [dict(tau_prov=tp, tau_conf=min(tp + d, 0.95), min_units_prov=u)
                 for tp, d, u in itertools.product([0.8, 0.7, 0.6, 0.5, 0.4], [0.2, 0.1], [3, 2, 1])]
 STAGE_B_GRID = [dict(theta_net=tn, theta_strong=ts, v_min=v, gamma=g)
                 for tn, ts, v, g in itertools.product([2.0, 1.0, 0.5, 0.25], [0.95, 0.85, 0.7], [5, 3, 2], [0.3, 1.0, 3.0])]
+
+# Clean protocol: the gate design (does the semantic path also need net >= theta_net?) is a
+# hyperparameter chosen on the validation event with the thresholds. Legacy (the original
+# design) comes first, so ties keep it.
+STAGE_B_GRID_CLEAN = [dict(semantic_requires_net=d, **g) for d in (True, False) for g in STAGE_B_GRID]
 
 
 def main():
@@ -211,12 +230,15 @@ def main():
     parser.add_argument("--root", default="artifacts/lifecycle")
     parser.add_argument("--only-event", default=None)
     parser.add_argument("--summarize", action="store_true", help="pool saved fold outputs into summary.json")
+    parser.add_argument("--legacy-gate", action="store_true", help="pre-change gate (semantic path also needs net >= theta_net); outputs under variants/legacy_gate")
+    parser.add_argument("--clean", action="store_true", help="clean protocol: stance features and gate design selected on validation only; outputs under variants/clean")
     args = parser.parse_args()
     root = Path(args.root)
     out = root / args.task
     C = len(TASKS[args.task])
+    dest = out / "variants" / ("clean" if args.clean else "legacy_gate") if (args.clean or args.legacy_gate) else out
     if args.summarize:
-        return summarize(out, C, args.task)
+        return summarize(out, C, args.task, dest)
     all_threads, embeddings = load_threads()
     embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
     threads = task_threads(all_threads, args.task)
@@ -224,7 +246,7 @@ def main():
     for held_out, validation, train_events in loeo_folds(threads):
         if args.only_event and held_out != args.only_event:
             continue
-        run_fold(args, held_out, validation, train_events, threads, labels, embeddings, all_threads, C, root, out)
+        run_fold(args, held_out, validation, train_events, threads, labels, embeddings, all_threads, C, root, out, dest)
 
 
 if __name__ == "__main__":
