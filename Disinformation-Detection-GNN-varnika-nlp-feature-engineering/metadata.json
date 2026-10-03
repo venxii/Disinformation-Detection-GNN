@@ -1,0 +1,76 @@
+{
+  "stage": "full",
+  "status": "complete",
+  "created_at": "2026-10-02T16:24:29+00:00",
+  "extraction_started_at": "2026-10-02T16:13:48+00:00",
+  "extraction_duration_seconds": 630.1,
+  "model_name": "vinai/bertweet-base",
+  "model_revision": "b349c1243407b0dcffeabb2337497477286e27ab",
+  "weights_format": "safetensors (identical to pytorch_model.bin)",
+  "embedding_dim": 768,
+  "dtype": "float32",
+  "pooling": "attention-mask-aware mean of the last hidden layer over all non-padding tokens (including <s> and </s>)",
+  "layer": "last hidden layer",
+  "max_length": 128,
+  "truncation": true,
+  "batch_size": 32,
+  "chunk_size": 1024,
+  "batching": "input order (no length sorting)",
+  "tokenizer_normalization": false,
+  "text_column": "text_bertweet",
+  "preprocessing_version": "1.1",
+  "input_file": "data/nlp/posts_clean.csv",
+  "input_sha256": "a8929580bf16643de9f980009e70d82d4587b9c15f3da5bede0dba4e2a0fb8ef",
+  "post_ids_sha256": "65c05b397c592de0d70e2b449320935ed78f61dbb860f08a9d9a859ebfaa7035",
+  "num_posts": 104582,
+  "completed_posts": 104582,
+  "requested_device": "mps",
+  "actual_device": "mps:0",
+  "mps_cpu_fallback_env": null,
+  "torch_version": "2.14.1",
+  "transformers_version": "5.18.0",
+  "id_file_columns": [
+    "embedding_index",
+    "post_id",
+    "root_id"
+  ],
+  "checkpoint_stats": {
+    "chunks_total": 103,
+    "chunks_reused": 20,
+    "chunks_computed": 83,
+    "chunks_recomputed_invalid": 0,
+    "posts_computed": 84102,
+    "assembled_ids_match_input": true,
+    "chunk_indices": true
+  },
+  "warnings": {
+    "truncated_posts": 2,
+    "truncated_post_ids": [
+      "524987107346243584",
+      "525434720390488064"
+    ],
+    "token_length_max": 180,
+    "empty_text_posts": 0
+  },
+  "checks": {
+    "1. shape is (expected posts, 768)": true,
+    "2. dtype is float32": true,
+    "3. no NaN or Inf": true,
+    "4. ids.csv has one row per post": true,
+    "5. no missing or duplicate post_id": true,
+    "6. post_id and root_id match posts_clean row by row": true,
+    "7. matrix rows match ID mapping (re-embedded spot check)": true,
+    "8. every post processed exactly once": true,
+    "9. no chunks skipped or duplicated": true,
+    "11. model weights frozen and unchanged": true,
+    "12. model in evaluation mode": true,
+    "13. attention-mask-aware mean pooling (manual check)": true
+  },
+  "check_details": {
+    "spot_check_rows": 64,
+    "spot_check_max_abs_diff": 0.0,
+    "manual_mean_pool_max_abs_diff": 1.430511474609375e-06,
+    "pilot_vs_full_max_abs_diff": 0.0
+  },
+  "checkpoint_recovery": "covered by unit tests (interrupt/resume, corrupted chunk, settings mismatch, leftover temp file); this run reused 20 chunks"
+}
