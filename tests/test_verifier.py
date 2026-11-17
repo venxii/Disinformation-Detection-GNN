@@ -44,5 +44,33 @@ class VerifierLeakageTests(unittest.TestCase):
         self.assertEqual(cache.depth[0][1], 0)
 
 
+class AdversarialHeadTests(unittest.TestCase):
+    def test_gradient_reversal_flips_event_gradient_and_leaves_inference_unchanged(self):
+        from lifecycle.verifier import _GradReverse
+        x = torch.ones(3, requires_grad=True)
+        _GradReverse.apply(x, 0.5).sum().backward()
+        self.assertTrue(torch.allclose(x.grad, torch.full((3,), -0.5)))
+        torch.manual_seed(0); plain = TemporalVerifier(VerifierConfig(num_classes=4, embed_dim=16, hidden=16, heads=2)).eval()
+        torch.manual_seed(0); adv = TemporalVerifier(VerifierConfig(num_classes=4, embed_dim=16, hidden=16, heads=2, num_events=3, adv_lambda=1.0)).eval()
+        adv.load_state_dict({**adv.state_dict(), **plain.state_dict()})
+        thread = toy_thread(); thread.rel_time[0] = 0.0
+        b = build_batch(ThreadCache([thread]), [(0, 5)], torch.randn(8, 16))
+        self.assertTrue(torch.allclose(plain(b), adv(b)))
+
+    def test_fit_with_event_head_uses_training_events_only(self):
+        from lifecycle.verifier import fit_verifier
+        threads = [toy_thread(6, seed=s) for s in range(6)]
+        for t in threads:
+            t.rel_time[0] = 0.0
+        labels = np.array([0, 1, 0, 1, 0, 1])
+        emb = torch.randn(6, 16)
+        cfg = VerifierConfig(num_classes=2, embed_dim=16, hidden=16, heads=2, num_events=2, adv_lambda=1.0)
+        train = np.array([0, 1, 2, 3])
+        events = {0: 0, 1: 0, 2: 1, 3: 1}  # no entry for validation threads 4, 5: a lookup there would raise
+        model, history = fit_verifier(ThreadCache(threads), train, np.array([4, 5]), labels, emb, cfg,
+                                      checkpoints=(0.5, 1.0), epochs=2, events=events, log=lambda *_: None)
+        self.assertEqual(len(history), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

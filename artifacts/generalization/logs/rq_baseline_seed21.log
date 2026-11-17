@@ -1,0 +1,46 @@
+/Users/vedachinta/Disinformation-Detection-GNN-main/.venv/lib/python3.13/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+[4class] charliehebdo-all-rnr-threads: val=468 test=2079
+[4class] ebola-essien-all-rnr-threads: val=468 test=14
+[4class] ferguson-all-rnr-threads: val=468 test=1143
+[4class] germanwings-crash-all-rnr-threads: val=890 test=468
+[4class] gurlitt-all-rnr-threads: val=890 test=138
+[4class] ottawashooting-all-rnr-threads: val=1221 test=890
+[4class] prince-toronto-all-rnr-threads: val=1221 test=233
+[4class] putinmissing-all-rnr-threads: val=1221 test=238
+[4class] sydneysiege-all-rnr-threads: val=2079 test=1221
+saved=artifacts/generalization/rq/baseline/seed21/4class/commit_policies/summary.json
+[4class] charliehebdo-all-rnr-threads: val U a/b=0.088/0.088 commit tau=0.4/0.6000000000000001 units=1 gate net=2.0 strong=0.95 v=5 gamma=0.3 | test U b=0.502 d=0.502 reopens d=0 (120s)
+[4class] ebola-essien-all-rnr-threads: val U a/b=0.142/0.141 commit tau=0.4/0.6000000000000001 units=1 gate net=2.0 strong=0.95 v=5 gamma=0.3 | test U b=-0.091 d=-0.091 reopens d=0 (86s)
+[4class] ferguson-all-rnr-threads: val U a/b=0.191/0.191 commit tau=0.4/0.6000000000000001 units=1 gate net=2.0 strong=0.95 v=5 gamma=0.3 | test U b=0.516 d=0.514 reopens d=4 (127s)
+[4class] germanwings-crash-all-rnr-threads: val U a/b=0.296/0.298 commit tau=0.4/0.6000000000000001 units=1 gate net=0.25 strong=0.95 v=3 gamma=0.3 | test U b=0.087 d=0.083 reopens d=50 (242s)
+[4class] gurlitt-all-rnr-threads: val U a/b=0.373/0.371 commit tau=0.4/0.6000000000000001 units=1 gate net=0.25 strong=0.85 v=3 gamma=0.3 | test U b=0.032 d=0.032 reopens d=0 (154s)
+[4class] ottawashooting-all-rnr-threads: val U a/b=0.433/0.433 commit tau=0.4/0.6000000000000001 units=1 gate net=2.0 strong=0.95 v=5 gamma=0.3 | test U b=0.314 d=0.315 reopens d=58 (299s)
+[4class] prince-toronto-all-rnr-threads: val U a/b=0.374/0.375 commit tau=0.4/0.6000000000000001 units=1 gate net=0.25 strong=0.7 v=3 gamma=0.3 | test U b=-0.180 d=-0.180 reopens d=42 (165s)
+[4class] putinmissing-all-rnr-threads: val U a/b=0.411/0.411 commit tau=0.4/0.6000000000000001 units=1 gate net=0.25 strong=0.95 v=5 gamma=0.3 | test U b=0.109 d=0.109 reopens d=1 (194s)
+[4class] sydneysiege-all-rnr-threads: val U a/b=0.491/0.498 commit tau=0.4/0.6000000000000001 units=1 gate net=2.0 strong=0.7 v=5 gamma=3.0 | test U b=0.308 d=0.305 reopens d=622 (296s)
+saved=artifacts/generalization/rq/baseline/seed21/4class/variants/clean/summary.json
+/Users/vedachinta/Disinformation-Detection-GNN-main/.venv/lib/python3.13/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/Users/vedachinta/Disinformation-Detection-GNN-main/experiments/run_injection.py:115: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /Users/runner/work/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:219.)
+  emb_t = torch.from_numpy(embeddings)
+[4class] charliehebdo-all-rnr-threads: 325 injected variants
+[4class] ebola-essien-all-rnr-threads: 10 injected variants
+[4class] ferguson-all-rnr-threads: 185 injected variants
+[4class] germanwings-crash-all-rnr-threads: 1475 injected variants
+[4class] gurlitt-all-rnr-threads: 135 injected variants
+[4class] ottawashooting-all-rnr-threads: 1245 injected variants
+[4class] prince-toronto-all-rnr-threads: 100 injected variants
+[4class] putinmissing-all-rnr-threads: 405 injected variants
+[4class] sydneysiege-all-rnr-threads: 1115 injected variants
+b_early_no_revision {"strong_single": 0.0, "distinct_volume": 0.0, "weak_duplicates": 0.0, "neutral": 0.0, "supporting": 0.0} P/R/F1 None 0.0 0.0
+c_revision_no_conflict_gate {"strong_single": 0.05622932745314223, "distinct_volume": 0.07166482910694598, "weak_duplicates": 0.07386990077177508, "neutral": 0.07607497243660419, "supporting": 0.04630650496141125} P/R/F1 0.3945578231292517 0.0639470782800441 0.11
+d_full {"strong_single": 0.10587002096436059, "distinct_volume": 0.1289308176100629, "weak_duplicates": 0.05241090146750524, "neutral": 0.09433962264150944, "supporting": 0.08385744234800839} P/R/F1 0.5045045045045045 0.11740041928721175 0.19
+abl_no_dedup {"strong_single": 0.11758584807492195, "distinct_volume": 0.14464099895941726, "weak_duplicates": 0.18730489073881373, "neutral": 0.09989594172736732, "supporting": 0.09469302809573361} P/R/F1 0.407108239095315 0.13111342351716962 0.198
+abl_strength_path_only {"strong_single": 0.09109947643979058, "distinct_volume": 0.0743455497382199, "weak_duplicates": 0.039790575916230364, "neutral": 0.05340314136125655, "supporting": 0.03769633507853403} P/R/F1 0.558303886925795 0.08272251308900523 0.144
+abl_volume_path_only {"strong_single": 0.024033437826541274, "distinct_volume": 0.06896551724137931, "weak_duplicates": 0.019853709508881923, "neutral": 0.051201671891327065, "supporting": 0.05851619644723093} P/R/F1 0.41784037558685444 0.04649947753396029 0.084
+abl_confirmed_locked {"strong_single": 0.08814270724029381, "distinct_volume": 0.10703043022035677, "weak_duplicates": 0.03882476390346275, "neutral": 0.07345225603357818, "supporting": 0.07030430220356768} P/R/F1 0.5166666666666667 0.09758656873032528 0.164
+abl_no_hysteresis {"strong_single": 0.1069182389937107, "distinct_volume": 0.1320754716981132, "weak_duplicates": 0.05241090146750524, "neutral": 0.09748427672955975, "supporting": 0.0880503144654088} P/R/F1 0.5010989010989011 0.11949685534591195 0.193
+done 4class
+saved artifacts/generalization/rq/baseline/seed21/rq_results.json
+RQ DONE baseline seed21

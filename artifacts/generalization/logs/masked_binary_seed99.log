@@ -1,0 +1,58 @@
+/Users/vedachinta/Disinformation-Detection-GNN-main/.venv/lib/python3.13/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/Users/vedachinta/Disinformation-Detection-GNN-main/experiments/run_verifiers.py:58: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /Users/runner/work/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:219.)
+  emb_t = torch.from_numpy(emb_np)
+[binary] held_out=ottawashooting-all-rnr-threads validation=sydneysiege-all-rnr-threads train=4313 val=1221 test=890
+    epoch  1 loss=12008.4 val_mF1(mean over checkpoints)=0.730
+    epoch  2 loss=8703.1 val_mF1(mean over checkpoints)=0.661
+    epoch  3 loss=8325.3 val_mF1(mean over checkpoints)=0.734
+    epoch  4 loss=7658.0 val_mF1(mean over checkpoints)=0.762
+    epoch  5 loss=7212.6 val_mF1(mean over checkpoints)=0.754
+    epoch  6 loss=6953.1 val_mF1(mean over checkpoints)=0.750
+    epoch  7 loss=6042.3 val_mF1(mean over checkpoints)=0.717
+    epoch  8 loss=5941.4 val_mF1(mean over checkpoints)=0.760
+    epoch  9 loss=5232.6 val_mF1(mean over checkpoints)=0.737
+    epoch 10 loss=4813.6 val_mF1(mean over checkpoints)=0.716
+    epoch 11 loss=4159.5 val_mF1(mean over checkpoints)=0.757
+    epoch 12 loss=3601.8 val_mF1(mean over checkpoints)=0.710
+  dgtr       T=2.44 test acc by checkpoint=[0.716, 0.719, 0.718, 0.719, 0.712, 0.71]
+  source_lr  T=2.45 test acc by checkpoint=[0.68, 0.68, 0.68, 0.68, 0.68, 0.68]
+  prefix_lr  T=4.85 test acc by checkpoint=[0.637, 0.639, 0.64, 0.652, 0.655, 0.644]
+  gat_full   T=4.89 test acc by checkpoint=[0.687, 0.684, 0.689, 0.69, 0.689, 0.671]
+  fold done in 150s
+[binary] held_out=prince-toronto-all-rnr-threads validation=sydneysiege-all-rnr-threads train=4970 val=1221 test=233
+    epoch  1 loss=13483.9 val_mF1(mean over checkpoints)=0.757
+    epoch  2 loss=11285.9 val_mF1(mean over checkpoints)=0.707
+    epoch  3 loss=10522.8 val_mF1(mean over checkpoints)=0.760
+    epoch  4 loss=9652.1 val_mF1(mean over checkpoints)=0.676
+    epoch  5 loss=9086.4 val_mF1(mean over checkpoints)=0.742
+    epoch  6 loss=8088.1 val_mF1(mean over checkpoints)=0.692
+    epoch  7 loss=7818.9 val_mF1(mean over checkpoints)=0.762
+    epoch  8 loss=7096.7 val_mF1(mean over checkpoints)=0.738
+    epoch  9 loss=6691.1 val_mF1(mean over checkpoints)=0.769
+    epoch 10 loss=6215.1 val_mF1(mean over checkpoints)=0.762
+    epoch 11 loss=5436.6 val_mF1(mean over checkpoints)=0.673
+    epoch 12 loss=4674.6 val_mF1(mean over checkpoints)=0.721
+  dgtr       T=3.07 test acc by checkpoint=[0.584, 0.575, 0.592, 0.562, 0.575, 0.579]
+  source_lr  T=2.22 test acc by checkpoint=[0.455, 0.455, 0.455, 0.455, 0.455, 0.455]
+  prefix_lr  T=4.01 test acc by checkpoint=[0.446, 0.451, 0.429, 0.421, 0.378, 0.378]
+  gat_full   T=4.53 test acc by checkpoint=[0.373, 0.365, 0.361, 0.348, 0.352, 0.348]
+  fold done in 170s
+[binary] held_out=putinmissing-all-rnr-threads validation=sydneysiege-all-rnr-threads train=4965 val=1221 test=238
+    epoch  1 loss=13540.0 val_mF1(mean over checkpoints)=0.727
+    epoch  2 loss=10531.9 val_mF1(mean over checkpoints)=0.760
+    epoch  3 loss=9607.7 val_mF1(mean over checkpoints)=0.739
+    epoch  4 loss=8957.2 val_mF1(mean over checkpoints)=0.745
+    epoch  5 loss=8321.2 val_mF1(mean over checkpoints)=0.639
+    epoch  6 loss=7718.7 val_mF1(mean over checkpoints)=0.676
+    epoch  7 loss=7211.7 val_mF1(mean over checkpoints)=0.729
+    epoch  8 loss=6364.9 val_mF1(mean over checkpoints)=0.734
+    epoch  9 loss=5785.9 val_mF1(mean over checkpoints)=0.721
+    epoch 10 loss=5451.2 val_mF1(mean over checkpoints)=0.743
+    epoch 11 loss=5054.2 val_mF1(mean over checkpoints)=0.748
+    epoch 12 loss=4418.5 val_mF1(mean over checkpoints)=0.719
+  dgtr       T=1.99 test acc by checkpoint=[0.647, 0.651, 0.651, 0.647, 0.655, 0.655]
+  source_lr  T=2.29 test acc by checkpoint=[0.567, 0.567, 0.567, 0.567, 0.567, 0.567]
+  prefix_lr  T=4.28 test acc by checkpoint=[0.542, 0.546, 0.563, 0.559, 0.58, 0.58]
+  gat_full   T=4.53 test acc by checkpoint=[0.613, 0.613, 0.613, 0.601, 0.588, 0.588]
+  fold done in 162s

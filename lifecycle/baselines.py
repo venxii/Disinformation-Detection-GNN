@@ -64,6 +64,8 @@ def prefix_lr(threads, train_idx, eval_idx, labels, embeddings, checkpoints, num
 
 
 def _pad(z, classes, num_classes):
+    if z.ndim == 1:  # binary decision_function: score of classes[1] relative to classes[0]
+        z = np.stack([np.zeros_like(z), z], axis=1)
     full = np.full((z.shape[0], num_classes), -1e4, dtype=np.float32)
     full[:, classes] = z
     return full

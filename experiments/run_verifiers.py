@@ -43,16 +43,22 @@ def main():
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--models", default=",".join(MODELS))
     parser.add_argument("--only-event", default=None)
+    parser.add_argument("--embedding-dir", default="data/nlp/embeddings/full")
+    parser.add_argument("--threads", type=int, default=0, help="torch CPU threads (0 = default)")
+    parser.add_argument("--adv-lambda", type=float, default=0.0, help=">0: DGTR with gradient-reversal event head over training events")
+    parser.add_argument("--merge", action="store_true", help="update only --models in existing fold files; keep the rest")
+    parser.add_argument("--skip-done", action="store_true", help="skip folds whose .json already exists")
     args = parser.parse_args()
-    torch.set_num_threads(max(1, torch.get_num_threads()))
+    torch.set_num_threads(args.threads or max(1, torch.get_num_threads()))
     out = Path(args.output) / args.task / "verifiers"
     out.mkdir(parents=True, exist_ok=True)
-    all_threads, emb_np = load_threads()
+    all_threads, emb_np = load_threads(embedding_dir=args.embedding_dir)
     threads = task_threads(all_threads, args.task)
     emb_np = np.ascontiguousarray(emb_np, dtype=np.float32)
     emb_t = torch.from_numpy(emb_np)
     label_map = TASKS[args.task]
     labels = np.array([label_map[t.label] for t in threads])
+    num_classes = len(set(label_map.values()))  # binary maps 4 label names onto 2 classes
     cache = ThreadCache(threads)
     by_event = {}
     for i, t in enumerate(threads):
@@ -61,23 +67,34 @@ def main():
     for held_out, validation, train_events in loeo_folds(threads):
         if args.only_event and held_out != args.only_event:
             continue
+        if args.skip_done and (out / f"{held_out}.json").exists():
+            continue
+        if args.merge and not (out / f"{held_out}.json").exists():
+            continue  # merge only updates folds that a full run already wrote
         start = time.time()
         train_idx = np.array(sorted(i for e in train_events for i in by_event[e]))
         val_idx, test_idx = np.array(by_event[validation]), np.array(by_event[held_out])
         print(f"[{args.task}] held_out={held_out} validation={validation} train={len(train_idx)} val={len(val_idx)} test={len(test_idx)}", flush=True)
         arrays = {"val_idx": val_idx, "test_idx": test_idx, "val_labels": labels[val_idx], "test_labels": labels[test_idx]}
-        meta = {"held_out": held_out, "validation": validation, "train_events": train_events, "seed": args.seed, "checkpoints": CHECKPOINTS, "temperatures": {}, "task": args.task}
+        meta = {"held_out": held_out, "validation": validation, "train_events": train_events, "seed": args.seed, "checkpoints": CHECKPOINTS, "temperatures": {}, "task": args.task, "embedding_dir": args.embedding_dir}
+        if args.merge and (out / f"{held_out}.json").exists():
+            arrays.update({k: v for k, v in np.load(out / f"{held_out}.npz").items() if k not in arrays})
+            old = json.loads((out / f"{held_out}.json").read_text())
+            assert old["seed"] == args.seed and old["validation"] == validation, "merge across different runs"
+            meta = {**old, "temperatures": dict(old["temperatures"])}
         eval_idx = {"val": val_idx, "test": test_idx}
         for name in models:
             if name == "dgtr":
-                config = VerifierConfig(num_classes=len(label_map))
-                model, history = fit_verifier(cache, train_idx, val_idx, labels, emb_t, config, checkpoints=CHECKPOINTS, epochs=args.epochs, seed=args.seed)
+                config = VerifierConfig(num_classes=num_classes, num_events=len(train_events) if args.adv_lambda else 0, adv_lambda=args.adv_lambda)
+                events = {i: train_events.index(threads[i].event) for i in train_idx}  # training events only
+                model, history = fit_verifier(cache, train_idx, val_idx, labels, emb_t, config, checkpoints=CHECKPOINTS, epochs=args.epochs, seed=args.seed, events=events)
                 logits = {k: predict_logits(model, cache, v, emb_t, CHECKPOINTS) for k, v in eval_idx.items()}
                 meta["dgtr_history"], meta["dgtr_config"] = history, config_dict(config)
                 torch.save(model.state_dict(), out / f"{held_out}_dgtr.pt")
             else:
                 fn = getattr(baselines, name)
-                logits = fn(threads, train_idx, eval_idx, labels, emb_np, CHECKPOINTS, len(label_map))
+                kwargs = {"seed": args.seed} if name == "gat_full" else {}  # LR baselines are deterministic (lbfgs)
+                logits = fn(threads, train_idx, eval_idx, labels, emb_np, CHECKPOINTS, num_classes, **kwargs)
             temperature = fit_temperature(logits["val"], labels[val_idx])
             meta["temperatures"][name] = temperature
             arrays[f"{name}_val"], arrays[f"{name}_test"] = logits["val"], logits["test"]

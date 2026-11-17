@@ -23,3 +23,16 @@ data/nlp/embeddings/full/embeddings.npy
 
 # Temporary files
 *.tmp
+
+# HF / model caches
+.cache/
+data/nlp/embeddings/masked/embeddings.npy
+
+# generalization branch: regenerable heavy binaries (scripts in experiments/generalization/ rebuild them)
+artifacts/generalization/**/*.pt
+artifacts/generalization/**/*.npz
+artifacts/generalization/**/trajectories/
+artifacts/generalization/**/injection_records.jsonl.gz
+artifacts/generalization/rq/*/seed*/stance_clean
+data/nlp/embeddings/masked/masked_texts.csv
+data/nlp/embeddings/masked/ids.csv

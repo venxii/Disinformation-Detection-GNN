@@ -1,0 +1,102 @@
+{
+  "held_out": "ferguson-all-rnr-threads",
+  "validation": "germanwings-crash-all-rnr-threads",
+  "train_events": [
+    "charliehebdo-all-rnr-threads",
+    "ebola-essien-all-rnr-threads",
+    "gurlitt-all-rnr-threads",
+    "ottawashooting-all-rnr-threads",
+    "prince-toronto-all-rnr-threads",
+    "putinmissing-all-rnr-threads",
+    "sydneysiege-all-rnr-threads"
+  ],
+  "seed": 42,
+  "checkpoints": [
+    0.1,
+    0.2,
+    0.3,
+    0.5,
+    0.75,
+    1.0
+  ],
+  "temperatures": {
+    "dgtr": 3.946791648864746,
+    "source_lr": 6.017330169677734,
+    "prefix_lr": 11.409822463989258,
+    "gat_full": 4.917727947235107
+  },
+  "task": "4class",
+  "embedding_dir": "data/nlp/embeddings/masked",
+  "dgtr_history": [
+    {
+      "epoch": 1,
+      "train_loss": 31791.704261779785,
+      "val_macro_f1_mean": 0.33239205015219714
+    },
+    {
+      "epoch": 2,
+      "train_loss": 24856.973282635212,
+      "val_macro_f1_mean": 0.2444766049111867
+    },
+    {
+      "epoch": 3,
+      "train_loss": 22998.245483398438,
+      "val_macro_f1_mean": 0.16345063851698244
+    },
+    {
+      "epoch": 4,
+      "train_loss": 21419.841168045998,
+      "val_macro_f1_mean": 0.19608892801691327
+    },
+    {
+      "epoch": 5,
+      "train_loss": 19548.60990077257,
+      "val_macro_f1_mean": 0.3020246611792063
+    },
+    {
+      "epoch": 6,
+      "train_loss": 17859.314664453268,
+      "val_macro_f1_mean": 0.2659334590054964
+    },
+    {
+      "epoch": 7,
+      "train_loss": 16533.945998489857,
+      "val_macro_f1_mean": 0.2790900747267984
+    },
+    {
+      "epoch": 8,
+      "train_loss": 15568.191310793161,
+      "val_macro_f1_mean": 0.25885146141370297
+    },
+    {
+      "epoch": 9,
+      "train_loss": 14023.537096560001,
+      "val_macro_f1_mean": 0.30579169031453995
+    },
+    {
+      "epoch": 10,
+      "train_loss": 12638.623609900475,
+      "val_macro_f1_mean": 0.34180497231250234
+    },
+    {
+      "epoch": 11,
+      "train_loss": 12003.031415015459,
+      "val_macro_f1_mean": 0.25282124873811784
+    },
+    {
+      "epoch": 12,
+      "train_loss": 11591.107156962156,
+      "val_macro_f1_mean": 0.30029599845082183
+    }
+  ],
+  "dgtr_config": {
+    "num_classes": 4,
+    "embed_dim": 768,
+    "hidden": 128,
+    "heads": 4,
+    "dropout": 0.3,
+    "temporal_layers": 1,
+    "num_events": 0,
+    "adv_lambda": 0.0
+  }
+}

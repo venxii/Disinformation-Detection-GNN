@@ -1,5 +1,12 @@
 # Results under the clean protocol (RQ1–RQ3)
 
+> **Superseded (5-seed rerun).** The numbers in this file come from a single seed-7 run. Same-seed reruns of the verifier are not bit-reproducible: macro-F1 moves by 0.019, and RQ3's d − c F1 by 0.11. The 5-seed verdicts are in `docs/claims_survival.md`. In particular:
+> - the "no detectable loss" for the calibration-aware threshold does not survive (≈ −0.5 pp, established);
+> - the RQ3 detection advantage does not survive (+0.10 ± 0.09, CI [−0.08, +0.28]);
+> - "DGTR worse than GAT on veracity" does not survive (a tie).
+>
+> This file is kept as the record of the single-run analysis.
+
 **Framing.** The core contribution is *decision timing*: when to stop waiting and commit. Revision is a *safety layer*.
 
 **Supersedes** the earlier version of this file. "Previous" columns below are the earlier numbers, kept for comparison. They came from a protocol with two selection leaks, both now fixed.

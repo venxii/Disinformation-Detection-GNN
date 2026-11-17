@@ -216,14 +216,22 @@ def rq3(task, dest):
 
 
 def main():
-    global THREADS
+    import argparse
+    global THREADS, ROOT
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", default=str(ROOT))
+    parser.add_argument("--tasks", default="4class,veracity")
+    parser.add_argument("--output", default="rq_results.json", help="file name under --root")
+    args = parser.parse_args()
+    ROOT = Path(args.root)
     THREADS, _ = load_threads()
     results = {}
-    for task in ("4class", "veracity"):
+    for task in args.tasks.split(","):
         r1 = rq1(task); plot_rq1(task, r1); r1.pop("curves")
-        results[task] = {"RQ1": r1, "RQ2": rq2(task, ROOT / task),
-                         "RQ2_legacy_gate": rq2(task, ROOT / task / "variants" / "legacy_gate"),
-                         "RQ3": rq3(task, ROOT / task), "RQ3_legacy_gate": rq3(task, ROOT / task / "variants" / "legacy_gate")}
+        results[task] = {"RQ1": r1}
+        for name, d in (("", ROOT / task), ("_legacy_gate", ROOT / task / "variants" / "legacy_gate")):
+            if (d / "injection_records.jsonl.gz").exists():  # optional in roots that only ran the clean protocol
+                results[task]["RQ2" + name], results[task]["RQ3" + name] = rq2(task, d), rq3(task, d)
         clean = ROOT / task / "variants" / "clean"
         if (clean / "injection_records.jsonl.gz").exists():
             results[task]["RQ2_clean"] = rq2(task, clean)
@@ -235,8 +243,8 @@ def main():
                                                     "commit": {k: r["commit_config"][k] for k in ("tau_prov", "tau_conf", "min_units_prov")}}
                                                 for e, r in folds.items()}
         print(f"done {task}", flush=True)
-    (ROOT / "rq_results.json").write_text(json.dumps(results, indent=2, default=float))
-    print("saved artifacts/lifecycle/rq_results.json")
+    (ROOT / args.output).write_text(json.dumps(results, indent=2, default=float))
+    print(f"saved {ROOT / args.output}")
 
 
 if __name__ == "__main__":

@@ -105,6 +105,7 @@ def main():
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--legacy-gate", action="store_true", help="read/write the variants/legacy_gate outputs")
     parser.add_argument("--clean", action="store_true", help="read/write the variants/clean outputs (validation-selected stance model and gate)")
+    parser.add_argument("--verifier-embedding-dir", default=None, help="embeddings the DGTR was trained on (e.g. event-masked); stance/evidence keep the original ones")
     args = parser.parse_args()
     out = Path(args.root) / args.task
     dest = out / "variants" / ("clean" if args.clean else "legacy_gate") if (args.clean or args.legacy_gate) else out
@@ -112,6 +113,9 @@ def main():
     all_threads, embeddings = load_threads()
     embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
     emb_t = torch.from_numpy(embeddings)
+    if args.verifier_embedding_dir:
+        _, venb = load_threads(embedding_dir=args.verifier_embedding_dir)  # same ids.csv row order
+        emb_t = torch.from_numpy(np.ascontiguousarray(venb, dtype=np.float32))
     threads = task_threads(all_threads, args.task)
     by_root = {t.root_id: i for i, t in enumerate(threads)}
     labels = np.array([TASKS[args.task][t.label] for t in threads])

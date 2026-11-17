@@ -40,6 +40,8 @@ class VerifierConfig:
     heads: int = 4
     dropout: float = 0.3
     temporal_layers: int = 1
+    num_events: int = 0          # >0 adds a gradient-reversal event head (training only; off by default)
+    adv_lambda: float = 0.0      # final GRL strength; ramped from 0 with the DANN schedule
 
 
 def _causal_depth(parent: np.ndarray) -> np.ndarray:
@@ -113,6 +115,17 @@ def build_batch(cache: ThreadCache, samples, embeddings: torch.Tensor):
     }
 
 
+class _GradReverse(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, lam):
+        ctx.lam = lam
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad):
+        return -ctx.lam * grad, None
+
+
 class TemporalVerifier(nn.Module):
     def __init__(self, config: VerifierConfig):
         super().__init__()
@@ -127,14 +140,17 @@ class TemporalVerifier(nn.Module):
         self.head = nn.Sequential(nn.LayerNorm(c.hidden), nn.Dropout(c.dropout), nn.Linear(c.hidden, c.num_classes))
         mask = torch.triu(torch.full((len(DEADLINES), len(DEADLINES)), float("-inf")), diagonal=1)
         self.register_buffer("causal_mask", mask)
+        self.event_head = nn.Sequential(nn.Linear(c.hidden, c.hidden), nn.GELU(), nn.Linear(c.hidden, c.num_events)) if c.num_events else None
 
-    def forward(self, b):
+    def forward(self, b, return_features=False):
         h = self.inp(torch.cat([b["x"], b["node_feats"]], dim=1))
         for conv, norm in zip(self.gat, self.norms):
             h = norm(h + torch.nn.functional.gelu(conv(h, b["edge_index"])))
         pooled = torch.cat([h[b["source_pos"]], global_mean_pool(h, b["batch"]), global_max_pool(h, b["batch"]), b["graph_feats"]], dim=1)
         z = self.pool(pooled)[b["token_index"]] + self.window_embedding  # [B, T, H]
         z = self.temporal(z, mask=self.causal_mask)
+        if return_features:
+            return self.head(z[:, -1]), z[:, -1]
         return self.head(z[:, -1])
 
 
@@ -144,8 +160,12 @@ def class_weights(labels, num_classes):
     return torch.tensor(weights, dtype=torch.float32)
 
 
-def fit_verifier(cache, train_idx, val_idx, labels, embeddings, config: VerifierConfig, *, checkpoints, epochs=12, batch_threads=64, lr=1e-3, seed=7, log=print):
-    """Train on every checkpoint prefix of training threads; select epoch by validation macro-F1 averaged over checkpoints."""
+def fit_verifier(cache, train_idx, val_idx, labels, embeddings, config: VerifierConfig, *, checkpoints, epochs=12, batch_threads=64, lr=1e-3, seed=7, log=print, events=None):
+    """Train on every checkpoint prefix of training threads; select epoch by validation macro-F1 averaged over checkpoints.
+
+    With config.num_events > 0, ``events[i]`` (an int id over *training* events only) supervises an
+    event classifier through gradient reversal on the final representation (Ganin & Lempitsky 2015).
+    Validation and held-out events never enter that head."""
     from sklearn.metrics import f1_score
 
     torch.manual_seed(seed)
@@ -154,6 +174,8 @@ def fit_verifier(cache, train_idx, val_idx, labels, embeddings, config: Verifier
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
     weights = class_weights(labels[train_idx], config.num_classes)
     best, best_state, history = -1.0, None, []
+    steps_per_epoch = math.ceil(len(train_idx) / batch_threads)
+    step, total_steps = 0, epochs * steps_per_epoch
     for epoch in range(1, epochs + 1):
         model.train()
         order = rng.permutation(train_idx)
@@ -163,7 +185,15 @@ def fit_verifier(cache, train_idx, val_idx, labels, embeddings, config: Verifier
             samples = [(ti, m) for ti in chunk for m in sorted(set(cache.threads[ti].checkpoint_lengths(checkpoints)))]
             b = build_batch(cache, samples, embeddings)
             y = torch.tensor([labels[ti] for ti, _ in samples])
-            loss = nn.functional.cross_entropy(model(b), y, weight=weights)
+            if config.num_events:
+                lam = config.adv_lambda * (2 / (1 + math.exp(-10 * step / total_steps)) - 1)
+                logits, feats = model(b, return_features=True)
+                ev = torch.tensor([events[ti] for ti, _ in samples])
+                ev_logits = model.event_head(_GradReverse.apply(feats, lam))
+                loss = nn.functional.cross_entropy(logits, y, weight=weights) + nn.functional.cross_entropy(ev_logits, ev)
+            else:
+                loss = nn.functional.cross_entropy(model(b), y, weight=weights)
+            step += 1
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)

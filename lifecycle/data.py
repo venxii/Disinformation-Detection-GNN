@@ -20,7 +20,8 @@ import numpy as np
 CHECKPOINTS = (0.10, 0.20, 0.30, 0.50, 0.75, 1.00)
 LABELS_4 = {"false": 0, "true": 1, "unverified": 2, "non-rumour": 3}
 LABELS_VERACITY = {"false": 0, "true": 1, "unverified": 2}
-TASKS = {"4class": LABELS_4, "veracity": LABELS_VERACITY}
+LABELS_BINARY = {"non-rumour": 0, "false": 1, "true": 1, "unverified": 1}
+TASKS = {"4class": LABELS_4, "veracity": LABELS_VERACITY, "binary": LABELS_BINARY}
 STANCES = ("support", "deny", "query", "comment")
 
 
